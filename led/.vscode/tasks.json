@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "openocd-flash",
+            "type": "process",
+            "command": "openocd",
+            "args": [
+                "-f", "interface/cmsis-dap.cfg",
+                "-f", "target/stm32g0x.cfg",
+                "-c", "program build/Debug/${workspaceFolderBasename}.elf verify reset exit"
+            ],
+            "problemMatcher": [],
+        }
+    ]
+}

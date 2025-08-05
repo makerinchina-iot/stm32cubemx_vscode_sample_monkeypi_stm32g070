@@ -3,6 +3,12 @@
     "tasks": [
         {
             "label": "openocd-flash",
+            "options": {
+                "statusbar": {
+                    "label":"$(pass) 烧录",
+                    "detail": "flash with openocd",
+                },
+            },
             "type": "process",
             "command": "openocd",
             "args": [

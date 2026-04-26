@@ -1,0 +1,131 @@
+/* source/widgets/sgl_label.c
+ *
+ * MIT License
+ *
+ * Copyright(c) 2023-present All contributors of SGL  
+ * Document reference link: https://sgl-docs.readthedocs.io
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+#include <sgl_core.h>
+#include <sgl_draw.h>
+#include <sgl_math.h>
+#include <sgl_log.h>
+#include <sgl_mm.h>
+#include <sgl_theme.h>
+#include <sgl_cfgfix.h>
+#include <string.h>
+#include "sgl_label.h"
+
+
+/**
+ * @brief construct the label object
+ * @param surf pointer to the surface
+ * @param obj pointer to the label object
+ * @param evt pointer to the event
+ * @return none
+ */
+static void sgl_label_construct_cb(sgl_surf_t *surf, sgl_obj_t* obj, sgl_event_t *evt)
+{
+    sgl_label_t *label = sgl_container_of(obj, sgl_label_t, obj);
+    sgl_pos_t align_pos;
+
+    SGL_ASSERT(label->font != NULL);
+
+    if (evt->type == SGL_EVENT_DRAW_MAIN) {
+        if (label->bg_flag) {
+            sgl_draw_fill_rect(surf, &obj->area, &obj->coords, obj->radius, label->bg_color, label->alpha);
+        }
+
+        align_pos = sgl_get_text_pos(&obj->coords, label->font, label->text, 0, (sgl_align_type_t)label->align);
+
+#if (CONFIG_SGL_LABEL_ROTATION)
+        if (label->rota == 0) {
+#endif 
+            sgl_draw_string(surf, &obj->area, align_pos.x + label->transform.offset.offset_x, 
+                                              align_pos.y + label->transform.offset.offset_y, 
+                                              label->text, label->color, label->alpha, label->font);
+#if (CONFIG_SGL_LABEL_ROTATION)
+        }
+        else {
+            const int16_t width = obj->area.x2 - obj->area.x1 + 1;
+            const int16_t height = obj->area.y2 - obj->area.y1 + 1;
+            const uint32_t buf_size = width * height;
+
+            sgl_color_t *temp_buf = sgl_malloc(buf_size * sizeof(sgl_color_t));
+            if (temp_buf == NULL) {
+                SGL_LOG_ERROR("sgl_label_construct_cb: malloc rotation temp buffer failed");
+                return;
+            }
+
+            for (uint32_t i = 0; i < buf_size; i++) {
+                temp_buf[i] = label->bg_color;
+            }
+
+            sgl_surf_t temp_surf = {
+                .x1 = 0,
+                .y1 = 0,
+                .x2 = width - 1,
+                .y2 = height - 1,
+                .buffer = temp_buf,
+                .w = width,
+                .h = height,
+                .dirty = NULL
+            };
+
+            sgl_draw_string(&temp_surf, &obj->area, align_pos.x, align_pos.y, 
+                                              label->text, label->color, label->alpha, label->font);
+            sgl_draw_xform_surf(surf, &temp_surf, &obj->area, obj->coords.x1, obj->coords.y1, label->transform.rotation);
+
+            sgl_free(temp_buf);
+        }
+#endif
+    }
+}
+
+
+/**
+ * @brief create a label object
+ * @param parent parent of the label
+ * @return pointer to the label object
+ */
+sgl_obj_t* sgl_label_create(sgl_obj_t* parent)
+{
+    sgl_label_t *label = sgl_malloc(sizeof(sgl_label_t));
+    if(label == NULL) {
+        SGL_LOG_ERROR("sgl_label_create: malloc failed");
+        return NULL;
+    }
+
+    /* set object all member to zero */
+    memset(label, 0, sizeof(sgl_label_t));
+
+    sgl_obj_t *obj = &label->obj;
+    sgl_obj_init(&label->obj, parent);
+    obj->construct_fn = sgl_label_construct_cb;
+
+    label->alpha = SGL_ALPHA_MAX;
+    label->bg_flag = 0;
+    label->color = SGL_THEME_TEXT_COLOR;
+    label->text = "";
+    label->transform.rotation = 0;
+    label->rota = 0;
+    label->font = sgl_get_system_font();
+
+    return obj;
+}
